@@ -28,3 +28,4 @@ firebase-admin
 streamlit-authenticator
 youtube-transcript-api
 genai
+tiktoken==0.5.2

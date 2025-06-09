@@ -1,56 +1,81 @@
-import os
-import json
-import PyPDF2
-import pandas as pd
-import traceback
-from dotenv import load_dotenv
-from src.mcqgenerator.utils import read_file, get_table_data
-from src.mcqgenerator.logger import logging
-
-import langchain_google_genai as genai
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain, SequentialChain
+from langchain.chains import SequentialChain
+from langchain_google_genai import ChatGoogleGenerativeAI
+import os
+from dotenv import load_dotenv
+import json
 
+# Load environment variables
 load_dotenv()
 
-api_key=os.getenv("GOOGLE_API_KEY")
+# Access API key
+api_key = os.getenv("GOOGLE_API_KEY")
 
-llm = genai.ChatGoogleGenerativeAI(google_api_key=api_key, model="gemini-1.5-pro-latest")
+# Create a quiz generation prompt template
+quiz_generation_template = """
+You are an expert quiz creator specializing in creating multiple-choice questions (MCQs) for {subject} students at {tone} level.
 
-template="""
-Text:{text}
-You are an expert MCQ maker. Given the above text, it is your job to \
-create a quiz  of {number} multiple choice questions for {subject} students in {tone} tone. 
-Make sure the questions are not repeated and check all the questions to be conforming the text as well.
-Make sure to format your response like  RESPONSE_JSON below  and use it as a guide. \
-Ensure to make {number} MCQs
-### RESPONSE_JSON
+Based on the following text, create {number} multiple-choice questions that test the understanding of key concepts.
+
+TEXT: {text}
+
+For each question:
+1. Frame a clear question
+2. Provide 4 options labeled as A, B, C, and D with only one correct answer
+3. Indicate the correct answer
+
+Format your response as a valid JSON object matching this exact structure:
 {response_json}
 
+Ensure your response contains ONLY the JSON object and nothing else.
 """
 
 quiz_generation_prompt = PromptTemplate(
     input_variables=["text", "number", "subject", "tone", "response_json"],
-    template=template
-    )
+    template=quiz_generation_template
+)
 
-quiz_chain = LLMChain(llm=llm, prompt=quiz_generation_prompt, output_key="quiz", verbose=True)
+# Create an evaluation prompt template
+evaluation_template = """
+You are an expert in evaluating multiple-choice questions (MCQs) for accuracy.
 
-template2="""
-You are an expert english grammarian and writer. Given a Multiple Choice Quiz for {subject} students.\
-You need to evaluate the complexity of the question and give a complete analysis of the quiz. Only use at max 50 words for complexity analysis. 
-if the quiz is not at per with the cognitive and analytical abilities of the students,\
-update the quiz questions which needs to be changed and change the tone such that it perfectly fits the student abilities
-Quiz_MCQs:
+Please evaluate the following {number} MCQs for {subject} at {tone} level.
+Make sure each question:
+1. Has a clearly defined correct answer
+2. Is relevant to the subject matter
+3. Has no factual errors
+4. Is grammatically correct
+
+If you find any errors or possible improvements, please suggest modifications.
+
+MCQs:
 {quiz}
 
-Check from an expert English Writer of the above quiz:
+Format your response as a JSON object similar to the input, but with any necessary corrections.
 """
 
-quiz_evaluation_prompt=PromptTemplate(input_variables=["subject", "quiz"], template=template2)
+evaluation_prompt = PromptTemplate(
+    input_variables=["number", "subject", "tone", "quiz"],
+    template=evaluation_template
+)
 
-review_chain = LLMChain(llm=llm, prompt=quiz_evaluation_prompt, output_key="review", verbose=True)
+# Initialize the LLM
+def get_llm():
+    llm = ChatGoogleGenerativeAI(model="gemini-2.0-flash", temperature=0.3)
+    return llm
 
-generate_evaluate_chain = SequentialChain(chains=[quiz_chain, review_chain], input_variables=["text", "number", "subject", "tone", "response_json"],
-                                          output_variables=["quiz", "review"], verbose=True)
+# Create a runnable sequence for generating and evaluating MCQs
+def create_generate_evaluate_chain():
+    llm = get_llm()
+    
+    # Create the quiz generation runnable
+    quiz_generator = quiz_generation_prompt | llm
+    
+    # Create the chain
+    generate_evaluate_chain = quiz_generator
+    
+    return generate_evaluate_chain
+
+# Create the chain
+generate_evaluate_chain = create_generate_evaluate_chain()
 

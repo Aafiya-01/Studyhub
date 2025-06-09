@@ -9,8 +9,27 @@ from youtube_transcript_api import YouTubeTranscriptApi
 def main():
     genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
+    # Get available models
+    models = genai.list_models()
+    available_models = [model.name for model in models]
+    
+    # Define preferred models in order
+    preferred_models = ["models/gemini-2.0-flash", "models/gemini-1.5-pro", "models/gemini-pro"]
+    
+    # Select the first available preferred model
+    model_name = None
+    for name in preferred_models:
+        if name in available_models or (name.startswith("models/") and name[7:] in [m[7:] if m.startswith("models/") else m for m in available_models]):
+            model_name = name
+            break
+    
+    # Fallback to any available model if preferred models aren't available
+    if not model_name and available_models:
+        model_name = available_models[0]
+    
     # Function to load gemini model and get responses
-    model = genai.GenerativeModel("gemini-pro")
+    model = genai.GenerativeModel(model_name)
+    print(f"Using model: {model_name}")
 
     prompt = """
     I am Bard, your AI YouTube video summarizer!
@@ -34,7 +53,6 @@ def main():
             raise e
 
     def generate_gemini_content(transcript_text, prompt):
-        model = genai.GenerativeModel("gemini-pro")
         response = model.generate_content(prompt + transcript_text)
         return response.text
 

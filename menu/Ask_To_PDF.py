@@ -6,7 +6,6 @@ from langchain_google_genai import GoogleGenerativeAIEmbeddings
 import google.generativeai as genai
 from langchain_community.vectorstores import FAISS
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain.chains.question_answering import load_qa_chain
 from langchain.prompts import PromptTemplate
 from dotenv import load_dotenv
 from streamlit_lottie import st_lottie 
@@ -14,6 +13,8 @@ import json
 import faiss
 import pickle
 import asyncio
+from langchain.chains import create_retrieval_chain
+from langchain.chains.combine_documents import create_stuff_documents_chain
 
 load_dotenv()
 
@@ -77,44 +78,43 @@ async def get_conversational_chain():
     Answer:
     """
 
-    # Updated model name - use an appropriate model from the available_models list
-    # Trying three options in order of preference
-    model_names = ["models/gemini-1.5-pro", "models/gemini-pro", "gemini-pro"]
-    model_name = None
+    # Updated to use gemini-2.0-flash model
+    model_name = "models/gemini-2.0-flash"
     
-    for name in model_names:
-        if name in available_models or (name.startswith("models/") and name[7:] in [m[7:] if m.startswith("models/") else m for m in available_models]):
-            model_name = name
-            break
-    
-    if not model_name:
-        # Fallback to the first available model
-        if available_models:
-            model_name = available_models[0]
-        else:
-            raise ValueError("No Gemini models available with your API key")
+    # Check if the model is available
+    if model_name not in available_models and model_name[7:] not in [m[7:] if m.startswith("models/") else m for m in available_models]:
+        # Fallback to another available model
+        fallback_models = ["models/gemini-1.5-pro", "models/gemini-pro", "gemini-pro"]
+        for name in fallback_models:
+            if name in available_models or (name.startswith("models/") and name[7:] in [m[7:] if m.startswith("models/") else m for m in available_models]):
+                model_name = name
+                break
     
     print(f"Using model: {model_name}")
     model = ChatGoogleGenerativeAI(model=model_name, temperature=0.3)
 
     prompt = PromptTemplate(template=prompt_template, input_variables=["context", "question"])
-    chain = load_qa_chain(model, chain_type="stuff", prompt=prompt)
+    
+    # Use the modern LangChain approach - create a document chain
+    document_chain = create_stuff_documents_chain(model, prompt)
 
-    return chain
+    return document_chain
 
 def user_input(user_question):
     try:
         vector_store = load_vector_store()
+        retriever = vector_store.as_retriever()
         docs = vector_store.similarity_search(user_question)
 
-        chain = asyncio.run(get_conversational_chain())
+        document_chain = asyncio.run(get_conversational_chain())
+        
+        # Use the modern approach to process the query
+        response = document_chain.invoke({
+            "context": docs,
+            "question": user_question
+        })
 
-        response = chain(
-            {"input_documents": docs, "question": user_question},
-            return_only_outputs=True
-        )
-
-        st.session_state.output_text = response["output_text"]
+        st.session_state.output_text = response
         st.write("Reply: ", st.session_state.output_text)
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
@@ -122,8 +122,6 @@ def user_input(user_question):
         st.error(traceback.format_exc())
 
 def main():
-    # REMOVED: st.set_page_config("PDF QA", page_icon='🔍', layout='centered')
-   
     st.write("<h1><center>One-Click Conversions</center></h1>", unsafe_allow_html=True)
     st.write("")
     

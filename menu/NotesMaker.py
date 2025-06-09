@@ -14,11 +14,17 @@ from streamlit_lottie import st_lottie
 import json
 import PyPDF2
 import docx2txt
-import pytesseract
 from PIL import Image
 import io
 import base64
 import httpx
+
+# Try to import pytesseract, but make it optional
+try:
+    import pytesseract
+    PYTESSERACT_AVAILABLE = True
+except ImportError:
+    PYTESSERACT_AVAILABLE = False
 
 # Constants for prompts
 DETAILED_PROMPT = """
@@ -247,12 +253,18 @@ def extract_text_from_file(uploaded_file):
             
         # Images (using OCR)
         elif file_extension in ['jpg', 'jpeg', 'png', 'bmp']:
-            try:
-                image = Image.open(uploaded_file)
-                text = pytesseract.image_to_string(image)
-                return text
-            except Exception as e:
-                st.error(f"OCR Error: {str(e)}. Make sure pytesseract is properly installed.")
+            if PYTESSERACT_AVAILABLE:
+                try:
+                    image = Image.open(uploaded_file)
+                    text = pytesseract.image_to_string(image)
+                    return text
+                except Exception as e:
+                    st.error(f"OCR Error: {str(e)}.")
+                    st.info("OCR processing is not working. Try uploading a text-based file instead.")
+                    return None
+            else:
+                st.error("Image text extraction is not available in this deployment.")
+                st.info("OCR functionality requires pytesseract which is not installed. Please upload a text-based file instead.")
                 return None
                 
         # Unsupported file type
@@ -359,8 +371,16 @@ def main():
     
     with tab2:
         st.markdown("### Generate Notes from Uploaded File")
-        uploaded_file = st.file_uploader("Upload a document (PDF, DOCX, TXT)", 
-                                       type=["pdf", "docx", "doc", "txt", "md", "jpg", "jpeg", "png"])
+        
+        # Update file types based on what's actually supported in the deployment
+        supported_types = ["pdf", "docx", "doc", "txt", "md"]
+        if PYTESSERACT_AVAILABLE:
+            supported_types.extend(["jpg", "jpeg", "png"])
+            upload_message = "Upload a document (PDF, DOCX, TXT) or image"
+        else:
+            upload_message = "Upload a document (PDF, DOCX, TXT)"
+        
+        uploaded_file = st.file_uploader(upload_message, type=supported_types)
         
         col1, col2 = st.columns(2)
         with col1:

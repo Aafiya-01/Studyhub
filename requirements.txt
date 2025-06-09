@@ -27,7 +27,7 @@ docx2txt>=0.8
 pillow>=10.0.0
 tiktoken==0.5.2
 
-# Optional dependencies (comment out if causing deployment issues)
+# No longer importing pytesseract directly in code, so it's optional
 # pytesseract>=0.3.10  # Requires system-level dependencies
 # poppler-utils  # System dependency, not a Python package
 # aiortc>=1.5.0  # Can be problematic on some hosting platforms

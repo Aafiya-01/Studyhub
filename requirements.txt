@@ -1,32 +1,35 @@
-streamlit 
-google-generativeai  
-python-dotenv 
-langchain 
-PyPDF2  
-faiss-cpu  
-langchain_google_genai 
-pdf2image
-poppler-utils
-streamlit_lottie
-spacy
-langchain-community
-beautifulsoup4
-numpy
-pandas
-Requests
-requests_html
-matplotlib
-
-streamlit-webrtc
-aiortc
-flask
-flask-socketio
-streamlit_chat
-
-streamlit-on-Hover-tabs
-httpx-oauth
-firebase-admin
-streamlit-authenticator
-youtube-transcript-api
-genai
+streamlit>=1.24.0
+google-generativeai>=0.3.0
+python-dotenv>=1.0.0
+langchain>=0.0.267
+langchain-community>=0.0.10
+langchain_google_genai>=0.0.4
+PyPDF2>=3.0.0
+faiss-cpu>=1.7.4
+pdf2image>=1.16.3
+streamlit_lottie>=0.0.3
+spacy>=3.7.1
+beautifulsoup4>=4.12.2
+numpy>=1.24.0
+pandas>=2.0.0
+requests>=2.31.0
+requests_html>=0.10.0
+matplotlib>=3.7.2
+httpx>=0.24.1
+httpx-oauth>=0.10.2
+youtube-transcript-api>=0.6.1
+streamlit-webrtc>=0.47.1
+streamlit_chat>=0.1.1
+streamlit-on-Hover-tabs>=1.0.1
+firebase-admin>=6.2.0
+streamlit-authenticator>=0.2.2
+docx2txt>=0.8
+pillow>=10.0.0
 tiktoken==0.5.2
+
+# Optional dependencies (comment out if causing deployment issues)
+# pytesseract>=0.3.10  # Requires system-level dependencies
+# poppler-utils  # System dependency, not a Python package
+# aiortc>=1.5.0  # Can be problematic on some hosting platforms
+# flask>=2.3.3
+# flask-socketio>=5.3.5

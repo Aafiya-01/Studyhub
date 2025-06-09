@@ -73,13 +73,28 @@ def main():
                             "tone": tone,
                             "response_json": json.dumps(RESPONSE_JSON)
                         })
-                        quiz_json = response.get('quiz', '')
-                        quiz_json = quiz_json[quiz_json.find('{'):quiz_json.rfind('}') + 1]  # Extract valid JSON
-
-                        if quiz_json:
-                            st.session_state.quiz_data = process_quiz_data(quiz_json)
+                        
+                        # Extract content from AIMessage object
+                        if hasattr(response, 'content'):
+                            quiz_text = response.content
                         else:
-                            st.error("No valid quiz data found.")
+                            quiz_text = str(response)  # Fallback if content attribute isn't available
+                        
+                        # Extract JSON from the response text
+                        try:
+                            # Try to find JSON in the text
+                            start_idx = quiz_text.find('{')
+                            end_idx = quiz_text.rfind('}') + 1
+                            
+                            if start_idx >= 0 and end_idx > start_idx:
+                                quiz_json = quiz_text[start_idx:end_idx]
+                                st.session_state.quiz_data = process_quiz_data(quiz_json)
+                            else:
+                                st.error("No valid JSON found in the response.")
+                        except Exception as e:
+                            st.error(f"Error extracting JSON from response: {str(e)}")
+                            st.code(quiz_text)  # Show the raw response for debugging
+                            
                     except Exception as e:
                         st.error(f"Error generating quiz: {str(e)}")
                         traceback.print_exc()

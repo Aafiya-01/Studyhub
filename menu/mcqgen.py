@@ -66,38 +66,86 @@ def main():
                 with st.spinner("Generating MCQs..."):
                     try:
                         text = read_file(uploaded_file)
-                        response = generate_evaluate_chain.invoke({
+                        
+                        # Adding debugging info
+                        st.write("Processing text from file...")
+                        
+                        # Create input for the model
+                        input_data = {
                             "text": text,
                             "number": mcq_count,
                             "subject": subject,
                             "tone": tone,
                             "response_json": json.dumps(RESPONSE_JSON)
-                        })
+                        }
                         
-                        # Extract content from AIMessage object
-                        if hasattr(response, 'content'):
-                            quiz_text = response.content
-                        else:
-                            quiz_text = str(response)  # Fallback if content attribute isn't available
-                        
-                        # Extract JSON from the response text
+                        # Get response from the model
                         try:
-                            # Try to find JSON in the text
-                            start_idx = quiz_text.find('{')
-                            end_idx = quiz_text.rfind('}') + 1
+                            response = generate_evaluate_chain.invoke(input_data)
                             
-                            if start_idx >= 0 and end_idx > start_idx:
-                                quiz_json = quiz_text[start_idx:end_idx]
-                                st.session_state.quiz_data = process_quiz_data(quiz_json)
+                            # Debug response type
+                            st.write(f"Response type: {type(response)}")
+                            
+                            # Extract content from AIMessage object - Multiple approaches for robustness
+                            quiz_text = None
+                            
+                            # Try different methods to extract content
+                            if hasattr(response, 'content'):
+                                quiz_text = response.content
+                            elif hasattr(response, 'text'):
+                                quiz_text = response.text
+                            elif hasattr(response, 'response'):
+                                quiz_text = response.response
+                            elif isinstance(response, dict) and 'content' in response:
+                                quiz_text = response['content']
+                            elif isinstance(response, dict) and 'text' in response:
+                                quiz_text = response['text']
                             else:
-                                st.error("No valid JSON found in the response.")
-                        except Exception as e:
-                            st.error(f"Error extracting JSON from response: {str(e)}")
-                            st.code(quiz_text)  # Show the raw response for debugging
+                                # Last resort: convert to string
+                                quiz_text = str(response)
+                                st.write("Used string conversion as fallback")
                             
+                            # Show extracted text for debugging
+                            st.write("Extracted quiz text from model response")
+                            
+                            # Extract JSON from the response text
+                            try:
+                                # Find JSON in the text
+                                if quiz_text:
+                                    # Try direct JSON parsing first
+                                    try:
+                                        json_data = json.loads(quiz_text)
+                                        quiz_json = json.dumps(json_data) # Convert back to ensure valid JSON
+                                        st.write("Successfully parsed JSON directly")
+                                    except json.JSONDecodeError:
+                                        # Fallback: extract JSON using string methods
+                                        st.write("Direct JSON parsing failed, trying string extraction")
+                                        start_idx = quiz_text.find('{')
+                                        end_idx = quiz_text.rfind('}') + 1
+                                        
+                                        if start_idx >= 0 and end_idx > start_idx:
+                                            quiz_json = quiz_text[start_idx:end_idx]
+                                            st.write(f"Extracted JSON from indexes {start_idx} to {end_idx}")
+                                        else:
+                                            st.error("No JSON delimiters found in the response")
+                                            st.code(quiz_text)
+                                            raise ValueError("Could not find JSON in response")
+                                    
+                                    # Process the extracted JSON
+                                    st.session_state.quiz_data = process_quiz_data(quiz_json)
+                                    st.success(f"Successfully created {len(st.session_state.quiz_data)} MCQs!")
+                                else:
+                                    st.error("No text extracted from the model response")
+                            except Exception as e:
+                                st.error(f"Error extracting JSON from response: {str(e)}")
+                                st.code(quiz_text)  # Show the raw response for debugging
+                        except Exception as e:
+                            st.error(f"Error invoking model: {str(e)}")
+                            st.error(traceback.format_exc())
+                                
                     except Exception as e:
                         st.error(f"Error generating quiz: {str(e)}")
-                        traceback.print_exc()
+                        st.error(traceback.format_exc())
 
     # Quiz Display
     if st.session_state.quiz_data and not st.session_state.quiz_submitted:

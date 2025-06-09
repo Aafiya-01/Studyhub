@@ -15,6 +15,7 @@ numpy
 pandas
 Requests
 requests_html
+matplotlib
 
 streamlit-webrtc
 aiortc
